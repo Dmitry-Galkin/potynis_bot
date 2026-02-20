@@ -48,9 +48,9 @@ LEAVE_MSG = [
 
 def get_join_msg(username: str) -> str:
     i = random.randint(0, len(JOIN_MSG) - 1)
-    return JOIN_MSG[i].replace("username", username)
+    return JOIN_MSG[i].replace("@username", username)
 
 
 def get_leave_msg(username: str) -> str:
     i = random.randint(0, len(LEAVE_MSG) - 1)
-    return LEAVE_MSG[i].replace("username", username)
+    return LEAVE_MSG[i].replace("@username", username)

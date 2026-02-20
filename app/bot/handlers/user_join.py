@@ -1,4 +1,4 @@
-from typing import Any, Tuple
+from typing import Any, Dict, Tuple
 
 import pandas as pd
 from aiogram import F
@@ -17,6 +17,7 @@ from app.bot.utils import (
     get_available_sessions,
     get_datetime_now_utc,
     get_join_msg,
+    get_user_info,
 )
 from app.config import Config, DataBaseSettings
 from app.db import table_insert, table_select, table_update
@@ -26,7 +27,7 @@ async def register_user_if_new(
     message: Message,
     db_config: DataBaseSettings,
     now: str,
-) -> Tuple[int, str]:
+) -> Tuple[int, Dict[str, Any]]:
     """Занесение инфомарции о новом пользователе."""
     user = {
         "tg_id": message.from_user.id,
@@ -75,10 +76,12 @@ async def register_user_if_new(
     user_df = await table_select(
         db_path=db_config.path,
         table=db_config.table_users,
-        select=["id", "username"],
+        select=["id"],
         where={"tg_id": user["tg_id"]},
     )
-    return int(user_df.at[0, "id"]), user_df.at[0, "username"]
+    # Инфа о пользователе.
+    user_info = await get_user_info(db_config=db_config, tg_id=user["tg_id"])
+    return int(user_df.at[0, "id"]), user_info
 
 
 def get_query_existed_sessions(
@@ -178,7 +181,7 @@ async def start_join_session(message: Message, state: FSMContext, **kwargs):
     # Текущее время
     now = get_datetime_now_utc()
     # Добавим или обновим информацию о пользователе, если надо.
-    user_id, username = await register_user_if_new(
+    user_id, user_info = await register_user_if_new(
         message=message, db_config=kwargs["config"].db, now=now
     )
     # Обновим информацию о занятиях в БД, если надо.
@@ -189,7 +192,7 @@ async def start_join_session(message: Message, state: FSMContext, **kwargs):
     )
     await state.update_data(owner_id=message.from_user.id)
     await state.update_data(user_id=user_id)
-    await state.update_data(username=username)
+    await state.update_data(user_info=user_info)
     await state.set_state(FSMJoinSession.choose_session)
 
 
@@ -254,8 +257,11 @@ async def confirm_booking(callback: CallbackQuery, state: FSMContext, **kwargs):
     )
     await state.clear()
     await callback.message.edit_text("🙂 Вы успешно записались на занятие!")
-    text_to_chat = f"🥳 Запись на занятие: {data['day']} {data['month_name']} ({data['weekday_name']}, {data['time']})\n\n"
-    text_to_chat += get_join_msg(username=data["username"])
+    text_to_chat = (
+        f"🥳 Запись на занятие: "
+        f"{data['day']} {data['month_name']} ({data['weekday_name']}, {data['time']})\n\n"
+    )
+    text_to_chat += get_join_msg(username=data["user_info"]["supername"])
     await kwargs["bot"].send_message(
         chat_id=kwargs["config"].bot.group_id,
         text=text_to_chat,

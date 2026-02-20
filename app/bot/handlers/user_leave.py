@@ -8,7 +8,7 @@ from app.bot.handlers.common import check_owner
 from app.bot.handlers.user import user_router
 from app.bot.keyboards.common import confirm_keyboard
 from app.bot.keyboards.user import booked_sessions_keyboard
-from app.bot.utils import WEEKDAY_NAME_MAPPING, get_leave_msg
+from app.bot.utils import WEEKDAY_NAME_MAPPING, get_leave_msg, get_user_info
 from app.db import table_select, table_update
 
 
@@ -34,14 +34,11 @@ async def start_leave_session(message: Message, state: FSMContext, **kwargs):
             db_config=kwargs["config"].db, user_id=message.from_user.id
         ),
     )
-    user_df = await table_select(
-        db_path=kwargs["config"].db.path,
-        table=kwargs["config"].db.table_users,
-        select=["username"],
-        where={"tg_id": message.from_user.id},
+    user_info = await get_user_info(
+        db_config=kwargs["config"].db, tg_id=message.from_user.id
     )
     await state.update_data(owner_id=message.from_user.id)
-    await state.update_data(username=user_df.at[0, "username"])
+    await state.update_data(user_info=user_info)
     await state.set_state(FSMLeaveSession.choose_session)
 
 
@@ -89,7 +86,7 @@ async def confirm_leaving(callback: CallbackQuery, state: FSMContext, **kwargs):
     await state.clear()
     await callback.message.edit_text("Вы отменили запись на занятие!")
     text_to_chat = f"😢 Отмена записи: {data['day']} {data['month_name']} ({data['weekday_name']}, {data['time']})\n\n"
-    text_to_chat += get_leave_msg(username=data["username"])
+    text_to_chat += get_leave_msg(username=data["user_info"]["supername"])
     await kwargs["bot"].send_message(
         chat_id=kwargs["config"].bot.group_id,
         text=text_to_chat,

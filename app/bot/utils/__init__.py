@@ -7,6 +7,7 @@ from .datetime import (
 )
 from .messages import get_join_msg, get_leave_msg
 from .sessions import get_actual_templates, get_available_sessions
+from .users import get_user_info
 
 __all__ = [
     "WEEKDAY_NAME_MAPPING",
@@ -18,4 +19,5 @@ __all__ = [
     "get_available_sessions",
     "get_join_msg",
     "get_leave_msg",
+    "get_user_info",
 ]
