@@ -1,0 +1,7 @@
+.env
+.env.dev
+.venv
+*.txt
+.idea
+__pycache__/
+yoga_classes

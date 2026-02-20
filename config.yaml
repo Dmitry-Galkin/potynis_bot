@@ -1,0 +1,11 @@
+db:
+  path: "app/db/yoga_classes"
+  table_info: "info"
+  table_templates: "templates"
+  table_sessions: "sessions"
+  table_users: "users"
+  table_registrations: "registrations"
+booking:
+  window_days: 7
+time:
+  local_timezone: "Europe/Moscow"
