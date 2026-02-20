@@ -1,4 +1,6 @@
 import asyncio
+import logging
+import sys
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
@@ -6,9 +8,19 @@ from aiogram.fsm.storage.memory import MemoryStorage
 from app.bot.filters import IsAdmin, IsAdminOrUser
 from app.bot.handlers import admin_router, common_router, user_router
 from app.bot.interface.interface import setup_commands
-from app.bot.middlewares import ConfigMiddleware
+from app.bot.middlewares import ConfigMiddleware, LoggingMiddleware
 from app.config.config import load_config
 from app.db.schema import init_all_tables
+
+# Логирование действий пользователей в терминал: время, id, first_name, last_name, username, команда.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    stream=sys.stdout,
+)
+logger_actions = logging.getLogger("user_actions")
+logger_actions.setLevel(logging.INFO)
 
 config = load_config(path_env=".env.dev", path_yaml="config.yaml")
 BOT_TOKEN = config.bot.token
@@ -18,7 +30,9 @@ storage = MemoryStorage()
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher(storage=storage)
 
-# Подставляем config и bot в обработчики через middleware.
+# Сначала логирование, затем подстановка config/bot.
+dp.message.outer_middleware(LoggingMiddleware())
+dp.callback_query.outer_middleware(LoggingMiddleware())
 config_middleware = ConfigMiddleware(config, bot)
 dp.message.outer_middleware(config_middleware)
 dp.callback_query.outer_middleware(config_middleware)
