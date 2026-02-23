@@ -22,7 +22,7 @@ logging.basicConfig(
 logger_actions = logging.getLogger("user_actions")
 logger_actions.setLevel(logging.INFO)
 
-config = load_config(path_env=".env.dev", path_yaml="config.yaml")
+config = load_config(path_env=".env", path_yaml="config.yaml")
 BOT_TOKEN = config.bot.token
 storage = MemoryStorage()
 
