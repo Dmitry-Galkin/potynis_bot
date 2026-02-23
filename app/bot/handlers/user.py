@@ -175,3 +175,16 @@ async def show_all_bookings(message: Message, **kwargs):
                 text += f"Полная запись 🔥\n"
             text += "\n"
     await message.answer(text, parse_mode="HTML")
+
+
+# Помощь.
+@user_router.message(Command(commands=["start", "help"]), StateFilter(default_state))
+async def show_all_commands(message: Message, **kwargs):
+    text = "Список доступных команд:\n\n"
+    text += "/join - записаться на занятие\n"
+    text += "/leave - отменить запись\n"
+    text += "/schedule - посмотреть расписание\n"
+    text += "/my_bookings - мои записи\n"
+    text += "/all_bookings - общая запись\n"
+    text += "/help - список доступных команд\n"
+    await message.answer(text)

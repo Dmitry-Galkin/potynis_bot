@@ -10,15 +10,19 @@ from app.config import BotSettings
 
 USER_COMMANDS = [
     BotCommand(command="/join", description="Записаться на занятие"),
-    BotCommand(command="/leave", description="Удалить запись"),
+    BotCommand(command="/leave", description="Отменить запись"),
     BotCommand(command="/schedule", description="Расписание занятий"),
     BotCommand(command="/my_bookings", description="Посмотреть мои записи"),
     BotCommand(command="/all_bookings", description="Посмотреть общую запись"),
+    BotCommand(command="/help", description="Помощь"),
+    BotCommand(command="/cancel", description="Отмена"),
 ]
 
-ADMIN_COMMANDS = USER_COMMANDS + [
-    BotCommand(command="/admin", description="Админская панель")
-]
+ADMIN_COMMANDS = (
+    USER_COMMANDS[:-2]
+    + [BotCommand(command="/admin", description="Админская панель")]
+    + USER_COMMANDS[-2:]
+)
 
 
 async def setup_commands(bot: Bot, bot_config: BotSettings) -> None:
