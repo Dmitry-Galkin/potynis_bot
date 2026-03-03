@@ -28,8 +28,11 @@ def get_available_sessions(
     # Текущее время.
     now = pd.to_datetime(get_datetime_now_utc()).tz_localize(UTC)
     # Сформируем датафрейм с датами на заданное число дней вперед.
+    # Запись идет на текущую и следующую недели.
+    current_weekday = now.tz_convert(config.time.local_timezone).weekday()
+    periods = config.booking.window_days - current_weekday
     session_df = pd.DataFrame(
-        {"dt": pd.date_range(start=now, periods=config.booking.window_days + 1)}
+        {"dt": pd.date_range(start=now, periods=periods)}
     )
     # Сконвертируем timezone.
     session_df["dt"] = session_df["dt"].dt.tz_convert(config.time.local_timezone)

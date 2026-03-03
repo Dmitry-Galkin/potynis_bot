@@ -10,7 +10,7 @@ admin_router = Router()
 
 
 @admin_router.message(Command(commands="admin"))
-async def process_start_command(message: Message):
+async def process_admin_command(message: Message):
     await message.answer(
         text="Выберите, что вы хотите сделать", reply_markup=main_admin_keyboard()
     )

@@ -6,6 +6,6 @@ db:
   table_users: "users"
   table_registrations: "registrations"
 booking:
-  window_days: 7
+  window_days: 14
 time:
   local_timezone: "Europe/Moscow"
