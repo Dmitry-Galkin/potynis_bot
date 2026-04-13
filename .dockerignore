@@ -1,5 +1,6 @@
-venv
 data
+.venv
+.idea
 .env
 .env.dev
 __pycache__

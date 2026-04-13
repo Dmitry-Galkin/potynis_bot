@@ -3,5 +3,7 @@
 .venv
 .idea
 __pycache__/
+*.tar
 yoga_classes
 yoga_classes_dev
+docker-instructions.txt
