@@ -19,15 +19,15 @@ def main_admin_keyboard(width: int = 1) -> InlineKeyboardMarkup:
     button_update_template = InlineKeyboardButton(
         text="Корректировать занятие", callback_data="edit_template"
     )
-    button_view_bookings_by_day = InlineKeyboardButton(
-        text="Посмотреть записи на день",
-        callback_data="view_bookings_by_day",
+    button_view_bookings_by_period = InlineKeyboardButton(
+        text="Посмотреть записи на день/период",
+        callback_data="view_bookings_by_period",
     )
     buttons = [
         button_add_template,
         button_remove_template,
         button_update_template,
-        button_view_bookings_by_day,
+        button_view_bookings_by_period,
     ]
     kb_builder = InlineKeyboardBuilder()
     kb_builder.row(*buttons, width=width)

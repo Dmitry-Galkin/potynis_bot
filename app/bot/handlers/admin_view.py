@@ -1,5 +1,5 @@
 from datetime import UTC
-from typing import Any, Tuple
+from typing import Any, Tuple, List
 
 import pandas as pd
 from aiogram import F
@@ -15,14 +15,14 @@ from app.config import Config, DataBaseSettings
 from app.db import table_select
 
 
-class FSMViewBookingsByDayTemplate(StatesGroup):
+class FSMViewBookingsByPeriodTemplate(StatesGroup):
     """Состояния при добавлении шаблона занятия."""
 
     # Состояние ожидания ввода дня недели.
     choose_date = State()
 
 
-def get_query_bookings_by_day(config: Config, date: str) -> Tuple[str, Tuple[Any, ...]]:
+def get_query_bookings_by_period(config: Config, dates: List[str]) -> Tuple[str, Tuple[Any, ...]]:
     db_config = config.db
     """Запрос для скачивания, кто был записан на занятия на опредленную дату."""
     query = f"""
@@ -41,13 +41,16 @@ def get_query_bookings_by_day(config: Config, date: str) -> Tuple[str, Tuple[Any
         ORDER BY
             t3.session_datetime, t2.username
     """
+    # Если передали одну дату.
+    if len(dates) == 1:
+        dates.append(dates[0])
     datetime_start = (
-        pd.Timestamp(f"{date} 00:00:00")
+        pd.Timestamp(f"{dates[0]} 00:00:00")
         .tz_localize(config.time.local_timezone)
         .tz_convert(UTC)
     )
     datetime_end = (
-        pd.Timestamp(f"{date} 23:59:59")
+        pd.Timestamp(f"{dates[1]} 23:59:59")
         .tz_localize(config.time.local_timezone)
         .tz_convert(UTC)
     )
@@ -60,39 +63,43 @@ def get_query_bookings_by_day(config: Config, date: str) -> Tuple[str, Tuple[Any
 
 # Админ нажал кнопку посмотреть записи на определенный день.
 @admin_router.callback_query(
-    F.data == "view_bookings_by_day", StateFilter(default_state)
+    F.data == "view_bookings_by_period", StateFilter(default_state)
 )
 async def start_add_template(callback: CallbackQuery, state: FSMContext):
     await state.update_data(owner_id=callback.from_user.id)
     await callback.message.edit_text(
-        "⏰ Введите дату, на которую хотите посмотреть записи\n"
-        "Формат: Год-Месяц-День (например 2026-01-21)"
+        "⏰ Введите дату или период, на которые хотите посмотреть записи.\n\n"
+        "Формат: Год-Месяц-День.\n\n"
+        "Например\n"
+        "➡️ Для одной даты: \t 2026-01-21\n"
+        "➡️ Для периода: \t 2026-01-21  2026-01-24"
     )
-    await state.set_state(FSMViewBookingsByDayTemplate.choose_date)
+    await state.set_state(FSMViewBookingsByPeriodTemplate.choose_date)
 
 
 # Админ ввел дату.
 @admin_router.message(
-    FSMViewBookingsByDayTemplate.choose_date,
+    FSMViewBookingsByPeriodTemplate.choose_date,
     ~StateFilter(default_state),
     ~Command(commands="cancel"),
 )
 async def enter_time(message: Message, state: FSMContext, **kwargs):
     if not await check_owner(message, state):
         return
-    date = message.text.strip()
-    if not is_date_format_valid(date):
-        await message.answer("❌ Неверный формат. Пример: 2026-01-21")
-        return
+    dates = message.text.strip().split()
+    for n, date in enumerate(dates):
+        if not is_date_format_valid(date):
+            await message.answer(f"❌ Неверный формат {n + 1}-й даты. Пример: 2026-01-21")
+            return
     config = kwargs["config"]
-    query, parameters = get_query_bookings_by_day(config=config, date=date)
+    query, parameters = get_query_bookings_by_period(config=config, dates=dates)
     bookings_df = await table_select(
         db_path=config.db.path,
         query=query,
         parameters=parameters,
     )
     if bookings_df.empty:
-        await message.answer(f"На этот день записей не было.")
+        await message.answer(f"На этот период записей не было.")
     else:
         text = ""
         # Преобразуем время к локальному.
