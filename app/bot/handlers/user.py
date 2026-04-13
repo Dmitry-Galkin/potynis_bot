@@ -77,6 +77,13 @@ def get_query_all_bookings(
     return query, parameters
 
 
+def correct_now(now: str, buffer_minutes: int = 60) -> str:
+    """Корректировка времени для запросов."""
+    # Чтобы не было такого, что занятие в 19:00,
+    # а в 19:01 уже нельзя посмотреть запись на это занятие.
+    return str(pd.Timestamp(now) - pd.Timedelta(minutes=buffer_minutes))
+
+
 # Комманда посмотреть все занятия.
 # TODO: добавить фильтр, кто может смотреть
 @user_router.message(Command(commands="schedule"), StateFilter(default_state))
@@ -101,6 +108,7 @@ async def show_schedule(message: Message, **kwargs):
 @user_router.message(Command(commands="my_bookings"), StateFilter(default_state))
 async def show_my_bookings(message: Message, **kwargs):
     now = get_datetime_now_utc()
+    now = correct_now(now)
     config = kwargs["config"]
     query, parameters = get_query_my_bookings(
         db_config=config.db, tg_id=message.from_user.id, now=now
@@ -133,6 +141,7 @@ async def show_my_bookings(message: Message, **kwargs):
 @user_router.message(Command(commands="all_bookings"), StateFilter(default_state))
 async def show_all_bookings(message: Message, **kwargs):
     now = get_datetime_now_utc()
+    now = correct_now(now)
     config = kwargs["config"]
     query, parameters = get_query_all_bookings(db_config=config.db, now=now)
     registrations_df = await table_select(
