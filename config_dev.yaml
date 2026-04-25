@@ -5,7 +5,7 @@ db:
   table_sessions: "sessions"
   table_users: "users"
   table_registrations: "registrations"
-  table_days_off: "table_days_off"
+  table_days_off: "days_off"
 booking:
   window_days: 14
 time:

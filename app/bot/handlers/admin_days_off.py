@@ -1,7 +1,3 @@
-from datetime import UTC
-from typing import Any, List, Tuple
-
-import pandas as pd
 from aiogram import F
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -10,19 +6,19 @@ from aiogram.types import CallbackQuery, Message
 
 from app.bot.handlers.admin import admin_router
 from app.bot.handlers.common import check_owner
+from app.bot.keyboards.admin import actual_days_off_keyboard
 from app.bot.keyboards.common import confirm_keyboard
 from app.bot.utils import is_date_format_valid
-from app.config import Config, DataBaseSettings
-from app.db import table_insert, table_select
+from app.db import table_insert, table_update
 
 
 class FSMAddDaysOff(StatesGroup):
     """Состояния при добавлении отпуска."""
 
     # Состояние ввода периода отпуска.
-    add_days_off_period = State()
+    add_days_off = State()
     # Состояние подтверждения введенных данных.
-    confirm_days_off_period = State()
+    confirm_days_off_adding = State()
 
 
 # Админ нажал кнопку добавить отпуск.
@@ -36,12 +32,12 @@ async def start_add_days_off(callback: CallbackQuery, state: FSMContext):
         "➡️ Для одной даты: \t 2026-01-21\n"
         "➡️ Для периода: \t 2026-01-21  2026-01-24"
     )
-    await state.set_state(FSMAddDaysOff.add_days_off_period)
+    await state.set_state(FSMAddDaysOff.add_days_off)
 
 
 # Админ ввел дату или период.
 @admin_router.message(
-    FSMAddDaysOff.add_days_off_period,
+    FSMAddDaysOff.add_days_off,
     ~StateFilter(default_state),
     ~Command(commands="cancel"),
 )
@@ -60,15 +56,15 @@ async def enter_period(message: Message, state: FSMContext, **kwargs):
     await state.update_data(date_off_start=dates[0])
     await state.update_data(date_off_end=dates[1])
     await message.answer(
-        f"📋 Подтвердите отпуск:\n" f"✔️ {dates[0]} - {dates[1]}",
+        f"📋 Подтвердите отпуск:\n" f"✔️ {dates[0]} — {dates[1]}",
         reply_markup=confirm_keyboard(),
     )
-    await state.set_state(FSMAddDaysOff.confirm_days_off_period)
+    await state.set_state(FSMAddDaysOff.confirm_days_off_adding)
 
 
 # Админ подтвердил введенную инфу о планируемом отпуске.
 @admin_router.callback_query(
-    FSMAddDaysOff.confirm_days_off_period,
+    FSMAddDaysOff.confirm_days_off_adding,
     F.data == "confirm",
     ~StateFilter(default_state),
 )
@@ -87,3 +83,60 @@ async def confirm_add(callback: CallbackQuery, state: FSMContext, **kwargs):
     )
     await state.clear()
     await callback.message.edit_text("✅ Отпуск успешно добавлен!")
+
+
+class FSMRemoveDaysOff(StatesGroup):
+    """Состояния при удалении отпуска."""
+
+    # Состояние выбора периода отпуска для удаления.
+    choose_days_off_for_removing = State()
+    # Состояние подтверждения введенных данных.
+    confirm_days_off_removing = State()
+
+
+# Админ нажал кнопку удалить отпуск.
+@admin_router.callback_query(F.data == "remove_days_off", StateFilter(default_state))
+async def start_remove_days_off(callback: CallbackQuery, state: FSMContext, **kwargs):
+    await state.update_data(owner_id=callback.from_user.id)
+    await callback.message.edit_text(
+        "Выберите отпуск для удаления:",
+        reply_markup=await actual_days_off_keyboard(config=kwargs["config"]),
+    )
+    await state.set_state(FSMRemoveDaysOff.choose_days_off_for_removing)
+
+
+# Админ выбрал отпуск для удаления.
+@admin_router.callback_query(
+    FSMRemoveDaysOff.choose_days_off_for_removing,
+    F.data.startswith("days_off"),
+    ~StateFilter(default_state),
+)
+async def choose_days_off_remove(callback: CallbackQuery, state: FSMContext):
+    if not await check_owner(callback, state):
+        return
+    i = callback.data.index(":") + 1
+    date_off_start, date_off_end, days_off_id = callback.data[i:].split("_")
+    await state.update_data(days_off_id=int(days_off_id))
+    await callback.message.edit_text(
+        f"📋 Подтвердите удаление отпуска {date_off_start} — {date_off_end}",
+        reply_markup=confirm_keyboard(),
+    )
+    await state.set_state(FSMRemoveDaysOff.confirm_days_off_removing)
+
+
+# Админ подтвердил удаление отпуска.
+@admin_router.callback_query(
+    FSMRemoveDaysOff.confirm_days_off_removing, F.data == "confirm", ~StateFilter(default_state)
+)
+async def confirm_remove(callback: CallbackQuery, state: FSMContext, **kwargs):
+    if not await check_owner(callback, state):
+        return
+    remove_info = await state.get_data()
+    await table_update(
+        db_path=kwargs["config"].db.path,
+        table=kwargs["config"].db.table_days_off,
+        where={"id": remove_info["days_off_id"]},
+        values={"is_actual": False},
+    )
+    await callback.message.edit_text(f"🚮 Отпуск успешно удален!")
+    await state.clear()

@@ -2,9 +2,9 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.bot.keyboards.common import cancel_inline_button
-from app.bot.utils import get_actual_templates
+from app.bot.utils import get_actual_days_off, get_actual_templates
 from app.bot.utils.datetime import WEEKDAY_NAME_MAPPING
-from app.config.config import DataBaseSettings
+from app.config.config import Config, DataBaseSettings
 from app.db.repository import table_select
 
 
@@ -107,5 +107,23 @@ async def template_items_keyboard(
         cancel_inline_button(),
     ]
     kb_builder = InlineKeyboardBuilder()
+    kb_builder.row(*buttons, width=width)
+    return kb_builder.as_markup()
+
+
+async def actual_days_off_keyboard(
+    config: Config, width: int = 1
+) -> InlineKeyboardMarkup:
+    """Кнопки с актуальными отпусками."""
+    days_off_df = await get_actual_days_off(config=config)
+    kb_builder = InlineKeyboardBuilder()
+    buttons = [
+        InlineKeyboardButton(
+            text=f"{row.date_off_start} — {row.date_off_end}",
+            callback_data=f"days_off:{row.date_off_start}_{row.date_off_end}_{row['id']}",
+        )
+        for i, row in days_off_df.iterrows()
+    ]
+    buttons.append(cancel_inline_button())
     kb_builder.row(*buttons, width=width)
     return kb_builder.as_markup()

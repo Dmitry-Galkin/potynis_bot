@@ -20,6 +20,33 @@ async def get_actual_templates(
     return templates_df
 
 
+async def get_actual_days_off(
+    config: Config,
+) -> pd.DataFrame:
+    """Актуальные отпуска."""
+    query = f"""
+        SELECT 
+            id, date_off_start, date_off_end
+        FROM
+            {config.db.table_days_off}
+        WHERE
+            is_actual = True
+            AND date_off_end > ?
+        ORDER BY
+            date_off_start
+    """
+    now = get_datetime_now_utc()
+    now = pd.to_datetime(now).tz_localize(config.time.local_timezone)
+    now = str(now).split("+")[0]
+    print(now)
+    days_off_df = await table_select(
+        db_path=config.db.path,
+        query=query,
+        parameters=(now,),
+    )
+    return days_off_df
+
+
 def get_available_sessions(
     templates_df: pd.DataFrame,
     config: Config,
@@ -31,9 +58,7 @@ def get_available_sessions(
     # Запись идет на текущую и следующую недели.
     current_weekday = now.tz_convert(config.time.local_timezone).weekday()
     periods = config.booking.window_days - current_weekday
-    session_df = pd.DataFrame(
-        {"dt": pd.date_range(start=now, periods=periods)}
-    )
+    session_df = pd.DataFrame({"dt": pd.date_range(start=now, periods=periods)})
     # Сконвертируем timezone.
     session_df["dt"] = session_df["dt"].dt.tz_convert(config.time.local_timezone)
     # День недели.
