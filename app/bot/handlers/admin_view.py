@@ -11,7 +11,7 @@ from aiogram.types import CallbackQuery, Message
 from app.bot.handlers.admin import admin_router
 from app.bot.handlers.common import check_owner
 from app.bot.utils import is_date_format_valid
-from app.config import Config, DataBaseSettings
+from app.config import Config
 from app.db import table_select
 
 
@@ -19,7 +19,7 @@ class FSMViewBookingsByPeriodTemplate(StatesGroup):
     """Состояния при добавлении шаблона занятия."""
 
     # Состояние ожидания ввода дня недели.
-    choose_date = State()
+    enter_date_or_period = State()
 
 
 def get_query_bookings_by_period(config: Config, dates: List[str]) -> Tuple[str, Tuple[Any, ...]]:
@@ -61,7 +61,7 @@ def get_query_bookings_by_period(config: Config, dates: List[str]) -> Tuple[str,
     return query, parameters
 
 
-# Админ нажал кнопку посмотреть записи на определенный день.
+# Админ нажал кнопку посмотреть записи на определенный день или период.
 @admin_router.callback_query(
     F.data == "view_bookings_by_period", StateFilter(default_state)
 )
@@ -74,12 +74,12 @@ async def start_add_template(callback: CallbackQuery, state: FSMContext):
         "➡️ Для одной даты: \t 2026-01-21\n"
         "➡️ Для периода: \t 2026-01-21  2026-01-24"
     )
-    await state.set_state(FSMViewBookingsByPeriodTemplate.choose_date)
+    await state.set_state(FSMViewBookingsByPeriodTemplate.enter_date_or_period)
 
 
-# Админ ввел дату.
+# Админ ввел дату или период.
 @admin_router.message(
-    FSMViewBookingsByPeriodTemplate.choose_date,
+    FSMViewBookingsByPeriodTemplate.enter_date_or_period,
     ~StateFilter(default_state),
     ~Command(commands="cancel"),
 )
