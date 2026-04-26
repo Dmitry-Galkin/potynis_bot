@@ -13,11 +13,12 @@ from app.bot.keyboards.common import confirm_keyboard
 from app.bot.keyboards.user import available_sessions_keyboard
 from app.bot.utils import (
     WEEKDAY_NAME_MAPPING,
+    get_actual_days_off,
     get_actual_templates,
     get_available_sessions,
     get_datetime_now_utc,
     get_join_msg,
-    get_user_info, get_actual_days_off,
+    get_user_info,
 )
 from app.config import Config, DataBaseSettings
 from app.db import table_insert, table_select, table_update
@@ -153,13 +154,12 @@ async def update_sessions_schedule(config: Config, now: str) -> None:
     days_off_df = await get_actual_days_off(config=config)
     for i, row in absent_df.iterrows():
         # Проверка, если дата попадает под отпуск, то проставим статус неактивно.
-        cond1 = (
-            pd.to_datetime(days_off_df.date_off_start) <= pd.Timestamp(row["session_datetime"])
+        cond1 = pd.to_datetime(days_off_df.date_off_start) <= pd.Timestamp(
+            row["session_datetime"]
         )
-        cond2 = (
-            pd.to_datetime(days_off_df.date_off_end) + pd.Timedelta(days=1)
-            >= pd.Timestamp(row["session_datetime"])
-        )
+        cond2 = pd.to_datetime(days_off_df.date_off_end) + pd.Timedelta(
+            days=1
+        ) >= pd.Timestamp(row["session_datetime"])
         if days_off_df[cond1 & cond2].empty:
             is_actual = True
         else:

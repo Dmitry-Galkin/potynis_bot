@@ -1,5 +1,5 @@
 from datetime import UTC
-from typing import Any, Tuple, List
+from typing import Any, List, Tuple
 
 import pandas as pd
 from aiogram import F
@@ -22,7 +22,9 @@ class FSMViewBookingsByPeriodTemplate(StatesGroup):
     enter_date_or_period = State()
 
 
-def get_query_bookings_by_period(config: Config, dates: List[str]) -> Tuple[str, Tuple[Any, ...]]:
+def get_query_bookings_by_period(
+    config: Config, dates: List[str]
+) -> Tuple[str, Tuple[Any, ...]]:
     db_config = config.db
     """Запрос для скачивания, кто был записан на занятия на опредленную дату."""
     query = f"""
@@ -89,7 +91,9 @@ async def enter_time(message: Message, state: FSMContext, **kwargs):
     dates = message.text.strip().split()
     for n, date in enumerate(dates):
         if not is_date_format_valid(date):
-            await message.answer(f"❌ Неверный формат {n + 1}-й даты. Пример: 2026-01-21")
+            await message.answer(
+                f"❌ Неверный формат {n + 1}-й даты. Пример: 2026-01-21"
+            )
             return
     config = kwargs["config"]
     query, parameters = get_query_bookings_by_period(config=config, dates=dates)

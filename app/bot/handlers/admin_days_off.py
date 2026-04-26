@@ -11,10 +11,9 @@ from app.bot.handlers.admin import admin_router
 from app.bot.handlers.common import check_owner
 from app.bot.keyboards.admin import actual_days_off_keyboard
 from app.bot.keyboards.common import confirm_keyboard
-from app.bot.utils import is_date_format_valid
+from app.bot.utils import get_datetime_now_utc, is_date_format_valid
 from app.config import Config
 from app.db import table_insert, table_select, table_update
-from app.bot.utils import get_datetime_now_utc
 
 
 async def update_session_status(
@@ -35,10 +34,7 @@ async def update_session_status(
         # Если, например, отпуск отменяем посередине,
         # то возьмем в качестве левой даты текущую.
         date_off_start = str(
-            max(
-                pd.Timestamp(date_off_start),
-                pd.Timestamp(get_datetime_now_utc())
-            )
+            max(pd.Timestamp(date_off_start), pd.Timestamp(get_datetime_now_utc()))
         )
     # Дата конца отпуска.
     date_off_end = str(
@@ -156,7 +152,7 @@ async def confirm_add(callback: CallbackQuery, state: FSMContext, **kwargs):
         date_off_start=data["date_off_start"],
         date_off_end=data["date_off_end"],
         to_activate=False,
-        config=kwargs["config"]
+        config=kwargs["config"],
     )
     await state.clear()
     await callback.message.edit_text("✅ Отпуск успешно добавлен!")
@@ -225,7 +221,7 @@ async def confirm_remove(callback: CallbackQuery, state: FSMContext, **kwargs):
         date_off_start=data["date_off_start"],
         date_off_end=data["date_off_end"],
         to_activate=True,
-        config=kwargs["config"]
+        config=kwargs["config"],
     )
     await callback.message.edit_text(f"🚮 Отпуск успешно удален!")
     await state.clear()
