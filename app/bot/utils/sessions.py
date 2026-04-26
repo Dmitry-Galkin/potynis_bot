@@ -31,14 +31,13 @@ async def get_actual_days_off(
             {config.db.table_days_off}
         WHERE
             is_actual = True
-            AND date_off_end > ?
+            AND date(date_off_end, '+1 day') > ?
         ORDER BY
             date_off_start
     """
     now = get_datetime_now_utc()
     now = pd.to_datetime(now).tz_localize(config.time.local_timezone)
     now = str(now).split("+")[0]
-    print(now)
     days_off_df = await table_select(
         db_path=config.db.path,
         query=query,
