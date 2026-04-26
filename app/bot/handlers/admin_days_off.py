@@ -1,3 +1,6 @@
+from datetime import UTC
+
+import pandas as pd
 from aiogram import F
 from aiogram.filters import Command, StateFilter
 from aiogram.fsm.context import FSMContext
@@ -9,7 +12,68 @@ from app.bot.handlers.common import check_owner
 from app.bot.keyboards.admin import actual_days_off_keyboard
 from app.bot.keyboards.common import confirm_keyboard
 from app.bot.utils import is_date_format_valid
-from app.db import table_insert, table_update
+from app.config import Config
+from app.db import table_insert, table_select, table_update
+from app.bot.utils import get_datetime_now_utc
+
+
+async def update_session_status(
+    date_off_start: str,
+    date_off_end: str,
+    to_activate: bool,
+    config: Config,
+) -> None:
+    """Активация/деактивация сессий в таблице sessions."""
+    # Переведем даты в UTC, т.к. в базе все в UTC.
+    # Дата начала отпуска.
+    date_off_start = str(
+        pd.to_datetime(f"{date_off_start} 00:00:00")
+        .tz_localize(config.time.local_timezone)
+        .tz_convert(UTC)
+    ).split("+")[0]
+    if to_activate:
+        # Если, например, отпуск отменяем посередине,
+        # то возьмем в качестве левой даты текущую.
+        date_off_start = str(
+            max(
+                pd.Timestamp(date_off_start),
+                pd.Timestamp(get_datetime_now_utc())
+            )
+        )
+    # Дата конца отпуска.
+    date_off_end = str(
+        pd.to_datetime(f"{date_off_end} 23:59:59")
+        .tz_localize(config.time.local_timezone)
+        .tz_convert(UTC)
+    ).split("+")[0]
+    # Смотрим, какие есть занятия в этот период.
+    query = f"""
+        SELECT 
+            id
+        FROM 
+            {config.db.table_sessions}
+        WHERE 
+            session_datetime BETWEEN ? AND ?
+            AND is_actual = ?
+    """
+    params = (date_off_start, date_off_end, not to_activate)
+    session_df = await table_select(
+        db_path=config.db.path,
+        table=config.db.table_sessions,
+        query=query,
+        parameters=params,
+    )
+    if session_df.empty:
+        return
+    # Обновляем статус.
+    for _, row in session_df.iterrows():
+        await table_update(
+            db_path=config.db.path,
+            table=config.db.table_sessions,
+            where={"id": int(row["id"])},
+            values={"is_actual": to_activate},
+        )
+    return
 
 
 class FSMAddDaysOff(StatesGroup):
@@ -81,6 +145,14 @@ async def confirm_add(callback: CallbackQuery, state: FSMContext, **kwargs):
             "is_actual": True,
         },
     )
+    # Если у нас уже были активированы занятия на эти даты в таблице sessions,
+    # то просто сделаем их не активными.
+    await update_session_status(
+        date_off_start=data["date_off_start"],
+        date_off_end=data["date_off_end"],
+        to_activate=False,
+        config=kwargs["config"]
+    )
     await state.clear()
     await callback.message.edit_text("✅ Отпуск успешно добавлен!")
 
@@ -117,6 +189,8 @@ async def choose_days_off_remove(callback: CallbackQuery, state: FSMContext):
     i = callback.data.index(":") + 1
     date_off_start, date_off_end, days_off_id = callback.data[i:].split("_")
     await state.update_data(days_off_id=int(days_off_id))
+    await state.update_data(date_off_start=date_off_start)
+    await state.update_data(date_off_end=date_off_end)
     await callback.message.edit_text(
         f"📋 Подтвердите удаление отпуска {date_off_start} — {date_off_end}",
         reply_markup=confirm_keyboard(),
@@ -126,17 +200,27 @@ async def choose_days_off_remove(callback: CallbackQuery, state: FSMContext):
 
 # Админ подтвердил удаление отпуска.
 @admin_router.callback_query(
-    FSMRemoveDaysOff.confirm_days_off_removing, F.data == "confirm", ~StateFilter(default_state)
+    FSMRemoveDaysOff.confirm_days_off_removing,
+    F.data == "confirm",
+    ~StateFilter(default_state),
 )
 async def confirm_remove(callback: CallbackQuery, state: FSMContext, **kwargs):
     if not await check_owner(callback, state):
         return
-    remove_info = await state.get_data()
+    data = await state.get_data()
     await table_update(
         db_path=kwargs["config"].db.path,
         table=kwargs["config"].db.table_days_off,
-        where={"id": remove_info["days_off_id"]},
+        where={"id": data["days_off_id"]},
         values={"is_actual": False},
+    )
+    # Если у нас уже были деактивированы занятия на эти даты в таблице sessions,
+    # то снова сделаем их активными.
+    await update_session_status(
+        date_off_start=data["date_off_start"],
+        date_off_end=data["date_off_end"],
+        to_activate=True,
+        config=kwargs["config"]
     )
     await callback.message.edit_text(f"🚮 Отпуск успешно удален!")
     await state.clear()
