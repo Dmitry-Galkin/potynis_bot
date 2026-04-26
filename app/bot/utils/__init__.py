@@ -6,7 +6,7 @@ from .datetime import (
     is_time_format_valid,
 )
 from .messages import get_join_msg, get_leave_msg
-from .sessions import get_actual_templates, get_available_sessions
+from .sessions import get_actual_days_off, get_actual_templates, get_available_sessions
 from .users import get_user_info
 
 __all__ = [
@@ -17,6 +17,7 @@ __all__ = [
     "is_date_format_valid",
     "get_actual_templates",
     "get_available_sessions",
+    "get_actual_days_off",
     "get_join_msg",
     "get_leave_msg",
     "get_user_info",

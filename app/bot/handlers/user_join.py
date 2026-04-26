@@ -13,6 +13,7 @@ from app.bot.keyboards.common import confirm_keyboard
 from app.bot.keyboards.user import available_sessions_keyboard
 from app.bot.utils import (
     WEEKDAY_NAME_MAPPING,
+    get_actual_days_off,
     get_actual_templates,
     get_available_sessions,
     get_datetime_now_utc,
@@ -97,8 +98,7 @@ def get_query_existed_sessions(
         LEFT JOIN 
             {db_config.table_templates} t2 ON (t1.template_id = t2.id)
         WHERE
-            t1.is_actual = TRUE
-            AND t2.is_actual = TRUE
+            t2.is_actual = TRUE
             AND session_datetime > ?
     """
     parameters = (now,)
@@ -150,14 +150,27 @@ async def update_sessions_schedule(config: Config, now: str) -> None:
         database_session_df, how="left", on=["session_datetime", "template_id"]
     )
     absent_df = database_session_df[pd.isnull(database_session_df["id"])]
+    # Отпуска.
+    days_off_df = await get_actual_days_off(config=config)
     for i, row in absent_df.iterrows():
+        # Проверка, если дата попадает под отпуск, то проставим статус неактивно.
+        cond1 = pd.to_datetime(days_off_df.date_off_start) <= pd.Timestamp(
+            row["session_datetime"]
+        )
+        cond2 = pd.to_datetime(days_off_df.date_off_end) + pd.Timedelta(
+            days=1
+        ) >= pd.Timestamp(row["session_datetime"])
+        if days_off_df[cond1 & cond2].empty:
+            is_actual = True
+        else:
+            is_actual = False
         await table_insert(
             db_path=config.db.path,
             table=config.db.table_sessions,
             values={
                 "session_datetime": str(row["session_datetime"]).split("+")[0],
                 "template_id": row["template_id"],
-                "is_actual": True,
+                "is_actual": is_actual,
             },
         )
 

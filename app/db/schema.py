@@ -39,6 +39,11 @@ async def init_all_tables(db_config: DataBaseSettings) -> None:
                 db_config.table_sessions,
             ),
         ),
+        # Таблица с отпусками.
+        (
+            query_init_table_days_off,
+            (db_config.table_days_off,),
+        ),
     ]:
         await init_table(func, *args, db_path=db_config.path)
 
@@ -119,6 +124,21 @@ def query_init_table_registrations(*args) -> str:
             corrected_at TEXT DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES {referenced_table_users} (id),
             FOREIGN KEY (session_id) REFERENCES {referenced_table_sessions} (id)
+        )
+    """
+    return query
+
+
+def query_init_table_days_off(*args) -> str:
+    """Запрос для создания таблицы с датами отсутствия занятий."""
+    # На случай отпуска или больничного преподавателя, например.
+    table = args[0]
+    query = f"""
+        CREATE TABLE IF NOT EXISTS {table} (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            date_off_start TEXT NOT NULL,
+            date_off_end TEXT NOT NULL,
+            is_actual BOOLEAN NOT NULL
         )
     """
     return query
